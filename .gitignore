@@ -29,3 +29,5 @@ gradle-app.setting
 
 # RethinkDB data
 rethinkdb_data/
+
+.DS_Store
