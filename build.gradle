@@ -11,7 +11,6 @@ dependencies {
 
     compile "io.vertx:vertx-core:3.5.4"
     compile "io.vertx:vertx-lang-groovy:3.5.4"
-    compile "com.rethinkdb:rethinkdb-driver:2.3.3"
 
     compile 'org.slf4j:slf4j-simple:1.7.22'
     compile 'org.slf4j:slf4j-api:1.7.22'
