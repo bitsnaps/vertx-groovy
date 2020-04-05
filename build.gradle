@@ -15,10 +15,12 @@ dependencies {
 
     compile "io.vertx:vertx-core:${vertxVersion}"
     compile "io.vertx:vertx-web:${vertxVersion}"
-    compile "io.vertx:vertx-auth-common:${vertxVersion}"
-    compile "io.vertx:vertx-lang-groovy:${vertxVersion}"
 
-    // not used in this demo
+    // not used in this branch
+//    compile "io.vertx:vertx-auth-common:${vertxVersion}"
+//    compile "io.vertx:vertx-lang-groovy:${vertxVersion}"
+
+    // not used in this app
 //    compile "io.vertx:vertx-jdbc-client:${vertxVersion}"
 //    compileOnly "io.vertx:vertx-codegen:${vertxVersion}"
 //    compile 'mysql:mysql-connector-java:6.0.5'
@@ -29,7 +31,7 @@ dependencies {
     compile 'org.codehaus.groovy:groovy-all:2.5.1'
 
     // testing
-    testCompile "io.vertx:vertx-unit:${vertxVersion}"
+//    testCompile "io.vertx:vertx-unit:${vertxVersion}"
     testCompile 'junit:junit:4.12'
 
 }
