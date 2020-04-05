@@ -1,7 +1,10 @@
 apply plugin: 'groovy'
-apply plugin: 'application'
+//apply plugin: 'application'
 
-mainClassName = 'Hello'
+targetCompatibility = 1.8
+sourceCompatibility = 1.8
+
+//mainClassName = 'Hello'
 
 ext {
     vertxVersion = "3.5.4"
@@ -14,11 +17,16 @@ repositories {
 dependencies {
 
     compile "io.vertx:vertx-core:${vertxVersion}"
-    compile "io.vertx:vertx-web:${vertxVersion}"
+    compile "io.vertx:vertx-web:${vertxVersion}" // for REST API
+    compile 'com.h2database:h2:1.4.200'
+
+//    compileOnly "io.vertx:vertx-codegen:${vertxVersion}" // Beans marshaller to JSON
+//    compile "io.vertx:vertx-redis-client:${vertxVersion}"
 
     // not used in this branch
 //    compile "io.vertx:vertx-auth-common:${vertxVersion}"
 //    compile "io.vertx:vertx-lang-groovy:${vertxVersion}"
+//    compile "io.vertx:vertx-rx-java:${vertxVersion}"
 
     // not used in this app
 //    compile "io.vertx:vertx-jdbc-client:${vertxVersion}"
@@ -34,4 +42,14 @@ dependencies {
 //    testCompile "io.vertx:vertx-unit:${vertxVersion}"
     testCompile 'junit:junit:4.12'
 
+}
+
+jar {
+    // by default fat jar
+    archiveName = 'vertx-blueprint-todo-backend-fat.jar'
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    manifest {
+        attributes 'Main-Class': 'io.vertx.core.Launcher'
+        attributes 'Main-Verticle': 'io.vertx.blueprint.todolist.verticles.SingleApplicationVerticle'
+    }
 }
