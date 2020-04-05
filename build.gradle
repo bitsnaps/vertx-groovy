@@ -3,15 +3,33 @@ apply plugin: 'application'
 
 mainClassName = 'Hello'
 
+ext {
+    vertxVersion = "3.5.4"
+}
+
 repositories {
     jcenter()
 }
 
 dependencies {
 
-    compile "io.vertx:vertx-core:3.5.4"
-    compile "io.vertx:vertx-lang-groovy:3.5.4"
+    compile "io.vertx:vertx-core:${vertxVersion}"
+    compile "io.vertx:vertx-web:${vertxVersion}"
+    compile "io.vertx:vertx-auth-common:${vertxVersion}"
+    compile "io.vertx:vertx-lang-groovy:${vertxVersion}"
+
+    // not used in this demo
+//    compile "io.vertx:vertx-jdbc-client:${vertxVersion}"
+//    compileOnly "io.vertx:vertx-codegen:${vertxVersion}"
+//    compile 'mysql:mysql-connector-java:6.0.5'
+
 
     compile 'org.slf4j:slf4j-simple:1.7.22'
     compile 'org.slf4j:slf4j-api:1.7.22'
-    compile 'org.codehaus.groovy:groovy-all:2.5.1'}
+    compile 'org.codehaus.groovy:groovy-all:2.5.1'
+
+    // testing
+    testCompile "io.vertx:vertx-unit:${vertxVersion}"
+    testCompile 'junit:junit:4.12'
+
+}
