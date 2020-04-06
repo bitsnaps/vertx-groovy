@@ -1,9 +1,33 @@
-apply plugin: 'application'
-
-mainClassName = 'Hello'
+apply plugin: 'java'
 
 ext {
     vertxVersion = "3.5.4"
+}
+
+task annotationProcessing(type: JavaCompile, group: 'build') {
+    source = sourceSets.main.java
+    classpath = configurations.compile + configurations.compileOnly
+    destinationDir = project.file('src/main/generated')
+    options.compilerArgs = [
+            "-proc:only",
+            "-processor", "io.vertx.codegen.CodeGenProcessor",
+            "-Acodegen.output=${destinationDir.absolutePath}"
+    ]
+}
+
+compileJava {
+    targetCompatibility = 1.8
+    sourceCompatibility = 1.8
+
+    dependsOn annotationProcessing
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs += 'src/main/generated'
+        }
+    }
 }
 
 repositories {
@@ -18,8 +42,8 @@ dependencies {
 //    compile "io.vertx:vertx-auth-common:${vertxVersion}"
 
     // not used in this app
-//    compile "io.vertx:vertx-jdbc-client:${vertxVersion}"
-//    compileOnly "io.vertx:vertx-codegen:${vertxVersion}"
+    compile "io.vertx:vertx-jdbc-client:${vertxVersion}"
+    compileOnly "io.vertx:vertx-codegen:${vertxVersion}"
 //    compile 'mysql:mysql-connector-java:6.0.5'
 
 
@@ -27,7 +51,18 @@ dependencies {
     compile 'org.slf4j:slf4j-api:1.7.22'
 
     // testing
-//    testCompile "io.vertx:vertx-unit:${vertxVersion}"
+    testCompile "io.vertx:vertx-unit:${vertxVersion}"
     testCompile 'junit:junit:4.12'
 
 }
+
+jar {
+    // by default fat jar
+    archiveName = 'vertx-hello-fat.jar'
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    manifest {
+        attributes 'Main-Class': 'io.vertx.core.Launcher'
+        attributes 'Main-Verticle': 'Hello'
+    }
+}
+
