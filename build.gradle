@@ -1,4 +1,3 @@
-apply plugin: 'groovy'
 apply plugin: 'application'
 
 mainClassName = 'Hello'
@@ -15,10 +14,8 @@ dependencies {
 
     compile "io.vertx:vertx-core:${vertxVersion}"
     compile "io.vertx:vertx-web:${vertxVersion}"
-
     // not used in this branch
 //    compile "io.vertx:vertx-auth-common:${vertxVersion}"
-//    compile "io.vertx:vertx-lang-groovy:${vertxVersion}"
 
     // not used in this app
 //    compile "io.vertx:vertx-jdbc-client:${vertxVersion}"
@@ -28,7 +25,6 @@ dependencies {
 
     compile 'org.slf4j:slf4j-simple:1.7.22'
     compile 'org.slf4j:slf4j-api:1.7.22'
-    compile 'org.codehaus.groovy:groovy-all:2.5.1'
 
     // testing
 //    testCompile "io.vertx:vertx-unit:${vertxVersion}"
