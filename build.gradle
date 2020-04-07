@@ -18,6 +18,7 @@ dependencies {
 
     compile "io.vertx:vertx-core:${vertxVersion}"
     compile "io.vertx:vertx-web:${vertxVersion}"
+    compile "io.vertx:vertx-rx-java2:${vertxVersion}"
 
     // testing
     testCompile "io.vertx:vertx-unit:${vertxVersion}"
