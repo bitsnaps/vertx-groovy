@@ -1,7 +1,10 @@
 apply plugin: 'java'
 apply plugin: 'application'
 
-mainClassName = 'Hello'
+mainClassName = 'io.vertx.core.Launcher'
+def mainVerticleName = 'HelloVerticle'
+//def watchForChange = 'src/**/*'
+//def doOnChange = './gradlew classes'
 
 ext {
     vertxVersion = "3.5.4"
@@ -24,4 +27,19 @@ dependencies {
     testCompile "io.vertx:vertx-unit:${vertxVersion}"
     testCompile 'junit:junit:4.12'
 
+}
+
+//jar {
+//    // by default fat jar
+//    archiveName = 'vertx-hello-fat.jar'
+//    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+//    manifest {
+//        attributes 'Main-Class': 'io.vertx.core.Launcher'
+//        attributes 'Main-Verticle': 'Hello'
+//    }
+//}
+
+run {
+    //args = ['run', mainVerticleName, "--redeploy=$watchForChange", "--launcher-class=$mainClassName", "--on-redeploy=$doOnChange"]
+    args = ['run', mainVerticleName, "--launcher-class=$mainClassName"]
 }
