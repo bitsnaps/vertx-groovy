@@ -25,19 +25,9 @@ dependencies {
 
     // testing
     testCompile "io.vertx:vertx-junit5:${vertxVersion}"
-//    testCompile 'junit:junit:4.12'
 
 }
 
-//jar {
-//    // by default fat jar
-//    archiveName = 'vertx-hello-fat.jar'
-//    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
-//    manifest {
-//        attributes 'Main-Class': 'io.vertx.core.Launcher'
-//        attributes 'Main-Verticle': 'Hello'
-//    }
-//}
 
 run {
     //args = ['run', mainVerticleName, "--redeploy=$watchForChange", "--launcher-class=$mainClassName", "--on-redeploy=$doOnChange"]
