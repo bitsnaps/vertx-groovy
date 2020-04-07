@@ -1,10 +1,8 @@
 import io.reactivex.Flowable;
-import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
-import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpServer;
-import io.vertx.core.http.HttpServerRequest;
-import io.vertx.ext.web.Router;
+import io.vertx.reactivex.core.AbstractVerticle;
+import io.vertx.reactivex.core.http.HttpServer;
+import io.vertx.reactivex.core.http.HttpServerRequest;
 
 
 public class HelloVerticle extends AbstractVerticle {
@@ -15,11 +13,21 @@ public class HelloVerticle extends AbstractVerticle {
     @Override
     public void start(Future<Void> fut) {
 
-
         final HttpServer server = vertx.createHttpServer();
-//        final Flowable<HttpServerRequest> requestFlowable =  server.requestStream().toFlowable();
+        final Flowable<HttpServerRequest> requestFlowable =  server.requestStream().toFlowable();
 
-        Router router = Router.router(vertx);
+        requestFlowable.subscribe(req -> {
+            req.response()
+                    .setChunked(true)
+                    .putHeader("content-type", "text/plain")
+                    .setStatusCode(200)
+                    .end("Hello RxVertx!");
+        });
+
+        server.listen(PORT);
+
+        // package: io.vertx.core.* instead of io.vertx.reactivex.core.
+/*        Router router = Router.router(vertx);
         // HelloVerticle
 //        server.requestHandler(req -> {
         router.route().handler(req -> {
@@ -36,6 +44,7 @@ public class HelloVerticle extends AbstractVerticle {
             } else {
                 fut.fail(http.cause());
             }
-        });
+        });*/
+
     }
 }
