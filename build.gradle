@@ -1,7 +1,8 @@
 apply plugin: 'java'
 
 ext {
-    vertxVersion = "3.5.4"
+//    vertxVersion = "3.5.4"
+    vertxVersion = "3.8.5"
 }
 
 task annotationProcessing(type: JavaCompile, group: 'build') {
@@ -38,14 +39,19 @@ dependencies {
 
     compile "io.vertx:vertx-core:${vertxVersion}"
     compile "io.vertx:vertx-web:${vertxVersion}"
+    compile("io.vertx:vertx-rx-java2:${vertxVersion}")
+
     // not used in this branch
 //    compile "io.vertx:vertx-auth-common:${vertxVersion}"
 
     // not used in this app
     compile "io.vertx:vertx-jdbc-client:${vertxVersion}"
+    compile "io.vertx:vertx-sql-common:${vertxVersion}"
     compileOnly "io.vertx:vertx-codegen:${vertxVersion}"
 //    compile 'mysql:mysql-connector-java:6.0.5'
 
+    // h2 database
+    compile 'com.h2database:h2:1.4.197'
 
     compile 'org.slf4j:slf4j-simple:1.7.22'
     compile 'org.slf4j:slf4j-api:1.7.22'
