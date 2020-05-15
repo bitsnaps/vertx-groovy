@@ -7,7 +7,8 @@ sourceCompatibility = 1.8
 //mainClassName = 'SingleApplicationVerticle'
 
 ext {
-    vertxVersion = "3.5.4"
+//    vertxVersion = "3.5.4"
+    vertxVersion = "3.8.5"
 }
 
 repositories {

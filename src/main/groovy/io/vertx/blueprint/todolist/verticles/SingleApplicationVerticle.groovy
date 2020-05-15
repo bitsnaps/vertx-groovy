@@ -11,18 +11,11 @@ import io.vertx.core.json.DecodeException
 import io.vertx.core.json.Json
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
-import io.vertx.ext.jdbc.JDBCClient
-import io.vertx.ext.sql.ResultSet
-import io.vertx.ext.sql.SQLClient
 import io.vertx.ext.sql.SQLConnection
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.RoutingContext
 import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.CorsHandler
-
-import java.util.stream.Collectors
-
-//import java.util.stream.Collectors
 
 /**
  * A Verticle is a component of the application. We can deploy verticles to run the components
@@ -40,16 +33,10 @@ class SingleApplicationVerticle extends AbstractVerticle {
  *
 */
 
-
     static final String HOST = "127.0.0.1"
-//    private static final String REDIS_HOST = "127.0.0.1"
     static final int PORT = 8080
-//    private static final int REDIS_PORT = 6379 // we do not use Redis here, we've used h2 instead
-
-//    private RedisClient redis;
 
     TodoService service
-    JDBCClient client
 
     static final String API_GET = "/todos/:todoId"
     static final String API_LIST_ALL = "/todos"
@@ -92,12 +79,12 @@ class SingleApplicationVerticle extends AbstractVerticle {
                 .end("Welcome to Todo RestAPI!")
         })
 
-//        router.get(API_GET).handler(this.handleGetTodo())
+        router.get(API_GET).handler(this.&handleGetTodo)
         router.get(API_LIST_ALL).handler(this.&handleGetAll)
         router.post(API_CREATE).handler(this.&handleCreateTodo)
-//        router.patch(API_UPDATE).handler(this.handleUpdateTodo())
-//        router.delete(API_DELETE).handler(this.handleDeleteOne())
-//        router.delete(API_DELETE_ALL).handler(this.handleDeleteAll())
+        router.patch(API_UPDATE).handler(this.&handleUpdateTodo)
+        router.delete(API_DELETE).handler(this.&handleDeleteOne)
+        router.delete(API_DELETE_ALL).handler(this.&handleDeleteAll)
 
         vertx.createHttpServer() // create a HTTP server
                 .requestHandler({ req ->
@@ -112,63 +99,61 @@ class SingleApplicationVerticle extends AbstractVerticle {
     }
 
     void initData() {
-
         JsonObject config = new JsonObject()
             .put("url","jdbc:h2:mem:~/tododb")
             .put("driver_class","org.h2.Driver")
             .put("user","sa")
             .put("password","")
+        this.service = new TodoService(vertx, config)
 
-        this.client =  JDBCClient.createNonShared(vertx, config)
-        this.client.getConnection({ conn ->
-            if (conn.succeeded()) {
-                SQLConnection connection = conn.result()
-                connection.query(TodoService.SQL_CREATE, { res2 ->
-                    if (res2.succeeded()) {
-                        log.info('*********** Table todo created ************')
-                    }
-                })
-            } else {
-                // Failed to get connection - deal with it
-                log.info('*********** Cannot create Table todo ************')
-
+        service.initData().setHandler({res ->
+            if (res.failed()){
+                log.error('Persistence service is not running!')
+                res.cause().printStackTrace()
             }
         })
-//        this.service = new TodoService(vertx, config)
-//        service.initData()
-
     }
 
+    /**
+     * curl localhost:8080/todos/1
+     * @param context
+     */
     private void handleGetTodo(RoutingContext context) {
-//        String todoID = context.request().getParam("todoId") // retrieve the path parameter todoId
-//        if (todoID == null)
-//            sendError(400, context.response()) // the server should send a 400 Bad Request error response to client
-//        else {
-//            redis.hget({ REDIS_TODO_KEY, todoId, x -> // hget means: get an entry by key from the map (RedisClient hget(String, String, Handler))
-//                if (x.succeeded()) {
-//                String result = x.result()
-//                if (result == null)
-//                    sendError(404, context.response())
-//                else {
-//                    context.response()
-//                            .putHeader("content-type", "application/json")
-//                            .end(result) // If the result is valid, we could write it to response by end method
-//                }
-//            } else
-//                sendError(503, context.response())
-//        })
-//        }
+        // retrieve the path parameter todoId
+        String todoID = context.request().getParam("todoId")
+        if (todoID == null)
+            sendError(400, context.response()) // the server should send a 400 Bad Request error response to client
+        else {
+            this.service.client.getConnection({ conn ->
+                if (conn.succeeded()) {
+                    SQLConnection connection = conn.result()
+                    connection.queryWithParams(TodoService.SQL_QUERY, new JsonArray([todoID]), { res ->
+                        if (res == null || res.result().getNumRows()==0)
+                            sendError(404, context.response())
+                        else {
+                            context.response()
+                                    .putHeader("content-type", "application/json")
+                                    .end(res.result().getRows(true).first().toString().toLowerCase()) // If the result is valid, we could write it to response by end method
+                        }
+                    })
+                } else {
+                    // Failed to get connection - deal with it
+                    sendError(503, context.response())
+                }
+            })
+
+        }
     }
 
     private void handleGetAll(RoutingContext context) {
-            this.client.getConnection({ conn ->
+            this.service.client.getConnection({ conn ->
             if (conn.succeeded()) {
                 SQLConnection connection = conn.result()
-                connection.query("SELECT * FROM todo", { res ->
+                connection.query(TodoService.SQL_QUERY_ALL, { res ->
                 if (res.succeeded()) {
                     String encoded = Json.encodePrettily(res.result()
                             .getRows(true)
-                            .collect{ todo -> new Todo(todo) }
+                            .collect{ x -> Todo.fromJson(x.toString()) }
                             .toList())
                     context.response()
                             .putHeader("content-type", "application/json")
@@ -180,29 +165,28 @@ class SingleApplicationVerticle extends AbstractVerticle {
                 sendError(503, context.response())
             }
         })
-
-//        context.response()
-//                .putHeader('content-type', 'text/html').write('ok')
-
     }
 
+    /**
+     * curl -d '{"id":1,"title":"Learn Vert.x","completed":true,"order":1,"url":"http://vertx.org"}' -H "Content-Type: application/json" http://127.0.0.1:8080/todos
+     * curl -d '{"id":2,"title":"Learn RxJS","completed":false,"order":1,"url":"http://rxjs.org"}' -H "Content-Type: application/json" http://127.0.0.1:8080/todos
+     * @param context
+     */
     private void handleCreateTodo(RoutingContext context) {
         try {
             //to retrieve JSON data from the request body and decode JSON data to todo entity with the specific constructor
-            final String encoded = Json.encodePrettily( Todo.fromJson( context.getBodyAsString()) )
-//            JsonArray payload = new JsonArray(encoded)
-//            String encoded = "INSERT INTO `todo` " +
-//                    "(`title`, `completed`, `order`, `url`) VALUES ('learning', 1, 1, 'http')"
-            this.client.getConnection({ conn ->
+            Todo todo = Todo.fromJson(context.getBodyAsString())
+            JsonArray payload = todo.toJsonArray()
+            this.service.client.getConnection({ conn ->
                 if (conn.succeeded()) {
                     SQLConnection connection = conn.result()
-                    connection.queryWithParams(TodoService.SQL_INSERT, encoded, { res ->
+                    connection.queryWithParams(TodoService.SQL_INSERT, payload, { res ->
                         if (res.succeeded())
                             context.response()
                                     // By default Vert.x Web is setting the status to 200 meaning OK. 201 means CREATED
                                     .setStatusCode(201)
                                     .putHeader("content-type", "application/json; charset=utf-8")
-                                    .end(encoded)
+                                    .end(Json.encodePrettily(todo))
                         else
                             sendError(503, context.response())
                     })
@@ -217,79 +201,103 @@ class SingleApplicationVerticle extends AbstractVerticle {
         }
     }
 
-    // PATCH /todos/:todoId
-    /*private void handleUpdateTodo(RoutingContext context) {
+    /**
+     * curl -X PATCH -d '{"id":1,"title":"Learn RxJS","completed":false,"order":2,"url":"http://rxjs.org"}' -H "Content-Type: application/json" http://127.0.0.1:8080/todos/1
+     * @param context
+     */
+    private void handleUpdateTodo(RoutingContext context) {
         try {
-            String todoID = context.request().getParam("todoId") // retrieve the path parameter todoId from the route context
-            final Todo newTodo = new Todo(context.getBodyAsString()) // get the new todo entity from the request body
+            // retrieve the path parameter todoId from the route context
+            String todoID = context.request().getParam("todoId")
+            // get the new todo entity from the request body
+            final Todo newTodo = Todo.fromJson(context.getBodyAsString())
             // handle error
             if (todoID == null || newTodo == null) {
                 sendError(400, context.response())
-                return
-            }
-
-            redis.hget({ REDIS_TODO_KEY, todoId, x -> // retrieve the old todo entity
-            if (x.succeeded()) {
-                String result = x.result()
-                if (result == null)
-                    sendError(404, context.response()) // check whether it exists. If not, return 404 Not Found status
-                else {
-                    Todo oldTodo = new Todo(result);
-                    String response = Json.encodePrettily(oldTodo.merge(newTodo)) // merge old todo with new todo and then encode to JSON string
-                    redis.hset({ REDISTODOKEY, todo_Id, resp, res -> // if no key matches in Redis, then create; or else update
-                    if (res.succeeded()) {
-                        context.response()
-                                .putHeader("content-type", "application/json")
-                                .end(response) // If the operation is successful, write response with 200 OK status
+            } else
+                this.service.client.getConnection({ conn ->
+                    if (conn.succeeded()) {
+                        SQLConnection connection = conn.result()
+                        JsonArray params = newTodo.toJsonArray()
+                        connection.updateWithParams( TodoService.SQL_UPDATE, params.add(newTodo.id), { res ->
+                            if (res.succeeded()) {
+                                context.response()
+                                        .putHeader("content-type", "application/json")
+                                        .end(newTodo.toJson())  // If the operation is successful, write response with 200 OK status
+                            } else {
+                                // check whether it exists. If not, return 404 Not Found status
+                                sendError(404, context.response())
+                            }
+                        })
+                    } else {
+                        // Failed to get connection - deal with it
+                        sendError(503, context.response())
                     }
                 })
-                }
-            } else
-                sendError(503, context.response())
-        })
         } catch (DecodeException e) {
             sendError(400, context.response())
         }
     }
-*/
-    /*private void handleDeleteOne(RoutingContext context) {
-        String todoID = context.request().getParam("todoId");
-        redis.hdel({ REDIS_TODO_KEY, todoId, res ->
-        if (res.succeeded())
-            context.response().setStatusCode(204).end() //Response to the HTTP method delete have generally no content (204 - NO CONTENT)
-        else
-            sendError(503, context.response())
-    });
-    }
-*/
-    /*private void handleDeleteAll(RoutingContext context) {
-        redis.del({ REDIS_TODO_KEY, res ->
-            if (res.succeeded())
-                context.response().setStatusCode(204).end()
-            else
+
+    /**
+     * curl -X DELETE localhost:8080/todos/1
+     * @param context
+     */
+    private void handleDeleteOne(RoutingContext context) {
+        String todoID = context.request().getParam("todoId")
+
+        this.service.client.getConnection({ conn ->
+            if (conn.succeeded()) {
+                SQLConnection connection = conn.result()
+                connection.updateWithParams(TodoService.SQL_DELETE, new JsonArray([todoID]), { res ->
+                    if (res.succeeded()) {
+                        //Response to the HTTP method delete have generally no content (204 - NO CONTENT)
+                        context.response().setStatusCode(204).end()
+                    } else {
+                        // check whether it exists. If not, return 404 Not Found status
+                        sendError(404, context.response())
+                    }
+                })
+            } else {
+                // Failed to get connection - deal with it
                 sendError(503, context.response())
-            })
+            }
+        })
+
     }
-*/
-    /*/ the id of todos could not be duplicate, so we implement this method
-    private Todo wrapObject(Todo todo, RoutingContext context) {
-        int id = todo.id
-        if (id > Todo.getIncId()) {
-            Todo.setIncIdWith(id)
-        } else if (id == 0)
-            todo.setIncId()
-        todo.setUrl(context.request().absoluteURI() + "/" + todo.getId());
-        return todo
+
+    /**
+     * curl -X DELETE localhost:8080/todos
+     * @param context
+     */
+    private void handleDeleteAll(RoutingContext context) {
+
+        this.service.client.getConnection({ conn ->
+            if (conn.succeeded()) {
+                SQLConnection connection = conn.result()
+                connection.execute( TodoService.SQL_DELETE_ALL, { res ->
+                    if (res.succeeded()) {
+                        context.response().setStatusCode(204).end()
+                    } else {
+                        sendError(404, context.response())
+                    }
+                })
+            } else {
+                sendError(503, context.response())
+            }
+        })
     }
-*/
+
     private void sendError(int statusCode, HttpServerResponse response) {
         response.setStatusCode(statusCode).end()
     }
 
 /*
+
 // these two are equivalent:
     void doAsync(A a, B b, Handler<R> handler);
     Future<R> doAsync(A a, B b);
+
 // The Future object refers to the result of an action that may not start, or pending, or finish or fail.
     Future<R> future = doAsync(A a, B b);
     future.setHandler(r -> {
@@ -299,6 +307,7 @@ class SingleApplicationVerticle extends AbstractVerticle {
             // do something on the result
         }
     });
+
 */
 
 }

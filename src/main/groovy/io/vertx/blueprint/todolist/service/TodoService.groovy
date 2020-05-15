@@ -1,14 +1,14 @@
 package io.vertx.blueprint.todolist.service
 
-import io.vertx.blueprint.todolist.entity.Todo
+import groovy.util.logging.Slf4j
 import io.vertx.core.Future
 import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.jdbc.JDBCClient
-import io.vertx.ext.sql.ResultSet
 import io.vertx.ext.sql.SQLClient
 import io.vertx.ext.sql.SQLConnection
 
+@Slf4j
 class TodoService {
 
     static final String SQL_CREATE = "CREATE TABLE IF NOT EXISTS `todo` (\n" +
@@ -37,39 +37,28 @@ class TodoService {
     JsonObject config
     SQLClient client
 
-//    TodoService(JsonObject config){
-//        this(Vertx.vertx(), config)
-//    }
-
-//    TodoService(Vertx vertx){
-//        JsonObject config = new JsonObject()
-//                .put("url","jdbc:h2:mem:~/tododb")
-//                .put("driver_class","org.h2.Driver")
-//                .put("user","sa")
-//                .put("password","")
-//        this.client = JDBCClient.createNonShared(vertx, config)
-//        this.vertx = vertx
-//    }
-
     TodoService(Vertx vertx, JsonObject config){
         this.vertx = vertx
         this.config = config
-        this.client = JDBCClient.createNonShared(vertx, config)
+        this.client = JDBCClient.createNonShared(this.vertx, this.config)
     }
 
-    Future<Boolean> initData(){
+    /**
+     * Service should either takes a Handler parameter or returns Future.
+     */
+    Future<Boolean>  initData(){
         Future<Boolean> result = Future.future()
         this.client.getConnection({ conn ->
             if (conn.succeeded()) {
                 SQLConnection connection = conn.result()
                 connection.query(SQL_CREATE, { res2 ->
                     if (res2.succeeded()) {
-                        println('Table todo created.')
+                        log.info('*********** Table todo created ************')
                     }
                 })
             } else {
                 // Failed to get connection - deal with it
-                println('Cannot create Table todo.')
+                log.info('*********** Cannot create Table todo ************')
             }
         })
         result

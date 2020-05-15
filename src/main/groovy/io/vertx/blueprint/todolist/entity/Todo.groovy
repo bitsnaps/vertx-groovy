@@ -1,19 +1,13 @@
 package io.vertx.blueprint.todolist.entity
 
 import groovy.json.JsonOutput
-import groovy.json.JsonParser
 import groovy.json.JsonSlurper
 import groovy.transform.Canonical
-import groovy.util.logging.Slf4j
-import io.vertx.core.json.JsonObject
-
-//import io.vertx.codegen.annotations.DataObject
+import io.vertx.core.json.JsonArray
 
 import java.util.concurrent.atomic.AtomicInteger
 
-@Slf4j
 @Canonical
-//@DataObject(generateConverter = true)
 class Todo {
     private static final AtomicInteger acc = new AtomicInteger(0) // counter
 
@@ -27,20 +21,17 @@ class Todo {
         return value == null ? defaultValue : value
     }
 
-    static fromJson(String jsonStr) {
-        log.info('****************** jsonStr')
-        log.info(jsonStr)
-        new Todo(new JsonSlurper().parseText(jsonStr))
+    static Todo fromJson(String jsonStr) {
+        // .getRows(true) from ResultSet didn't work, so I'm converting everything to lowercase
+        new Todo(new JsonSlurper().parseText(jsonStr.toLowerCase()))
     }
 
-    Todo(JsonObject jsonTodo){
-//        this.merge(Todo.fromJson(jsonTodo))
-//        this.merge(jsonTodo.getMap() as Todo)
-        this.id = jsonTodo.getInteger("ID")
-        this.title = jsonTodo.getString("TITLE")
-        this.completed = jsonTodo.getValue("COMPLETED")
-        this.order = jsonTodo.getInteger("ORDER")
-        this.url = jsonTodo.getString("URL")
+    JsonArray toJsonArray(){
+        new JsonArray([this.id, this.title, this.completed, this.order, this.url])
+    }
+
+    String toJson(){
+        JsonOutput.toJson(this)
     }
 
     Todo merge(Todo todo) {
