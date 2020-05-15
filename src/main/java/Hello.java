@@ -56,6 +56,13 @@ public class Hello extends RestfulApiVerticle {
         // Enable CORS.
         enableCorsSupport(router);
 
+        // Home root
+        router.get("/").handler(req ->
+                req.response()
+                        .putHeader("content-type", "text/html")
+                        .end("Todo Rest API.")
+        );
+
         // routes
         router.get(Constants.API_GET).handler(this::handleGetTodo);
         router.get(Constants.API_LIST_ALL).handler(this::handleGetAll);
