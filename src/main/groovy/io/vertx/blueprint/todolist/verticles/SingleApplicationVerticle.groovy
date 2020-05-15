@@ -1,43 +1,67 @@
 package io.vertx.blueprint.todolist.verticles
 
+import groovy.util.logging.Slf4j
 import io.vertx.blueprint.todolist.entity.Todo
+import io.vertx.blueprint.todolist.service.TodoService
 import io.vertx.core.AbstractVerticle
 import io.vertx.core.Future
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.http.HttpServerResponse
 import io.vertx.core.json.DecodeException
 import io.vertx.core.json.Json
+import io.vertx.core.json.JsonArray
+import io.vertx.core.json.JsonObject
+import io.vertx.ext.jdbc.JDBCClient
+import io.vertx.ext.sql.ResultSet
+import io.vertx.ext.sql.SQLClient
+import io.vertx.ext.sql.SQLConnection
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.RoutingContext
 import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.CorsHandler
 
-//import java.util.stream.Collectors
+import java.util.stream.Collectors
 
-import static io.vertx.blueprint.todolist.Constants.*
+//import java.util.stream.Collectors
 
 /**
  * A Verticle is a component of the application. We can deploy verticles to run the components
  */
+@Slf4j
 class SingleApplicationVerticle extends AbstractVerticle {
 
-/*
-#running process:
-gradle build
-java -jar build/libs/vertx-todo.jar
+/**
+ *
+ * Build:
+ * gradle build
+ *
+ * Run:
+ * java -jar build/libs/vertx-todo.jar
+ *
 */
 
-    public static final String HTTP_HOST = "127.0.0.1"
+
+    static final String HOST = "127.0.0.1"
 //    private static final String REDIS_HOST = "127.0.0.1"
-    public static final int PORT = 8080
+    static final int PORT = 8080
 //    private static final int REDIS_PORT = 6379 // we do not use Redis here, we've used h2 instead
 
 //    private RedisClient redis;
 
+    TodoService service
+    JDBCClient client
+
+    static final String API_GET = "/todos/:todoId"
+    static final String API_LIST_ALL = "/todos"
+    static final String API_CREATE = "/todos"
+    static final String API_UPDATE = "/todos/:todoId"
+    static final String API_DELETE = "/todos/:todoId"
+    static final String API_DELETE_ALL = "/todos"
+
     //asynchronous start method
     @Override
     void start(Future<Void> future) throws Exception {
-//        initData()
+        initData()
 
         Router router = Router.router(vertx) // The router is responsible for dispatching HTTP requests to the certain right handler
         // CORS support
@@ -53,11 +77,13 @@ java -jar build/libs/vertx-todo.jar
         allowMethods.add(HttpMethod.DELETE)
         allowMethods.add(HttpMethod.PATCH)
 
-        router.route().handler(CorsHandler.create("*") // The route() method with no parameters means that it matches all requests
+        // The route() method with no parameters means that it matches all requests
+        router.route().handler(CorsHandler.create("*")
                 .allowedHeaders(allowHeaders)
                 .allowedMethods(allowMethods))
 
-        router.route().handler(BodyHandler.create()) // The BodyHandler allows you to retrieve request bodies and read data
+        // The BodyHandler allows you to retrieve request bodies and read data
+        router.route().handler(BodyHandler.create())
 
         // routes
         router.get('/').handler({ req ->
@@ -67,8 +93,8 @@ java -jar build/libs/vertx-todo.jar
         })
 
 //        router.get(API_GET).handler(this.handleGetTodo())
-//        router.get(API_LIST_ALL).handler(this.handleGetAll())
-//        router.post(API_CREATE).handler(this.handleCreateTodo())
+        router.get(API_LIST_ALL).handler(this.&handleGetAll)
+        router.post(API_CREATE).handler(this.&handleCreateTodo)
 //        router.patch(API_UPDATE).handler(this.handleUpdateTodo())
 //        router.delete(API_DELETE).handler(this.handleDeleteOne())
 //        router.delete(API_DELETE_ALL).handler(this.handleDeleteAll())
@@ -76,7 +102,7 @@ java -jar build/libs/vertx-todo.jar
         vertx.createHttpServer() // create a HTTP server
                 .requestHandler({ req ->
             router.accept(req)
-        }).listen(PORT, HTTP_HOST,{ result ->
+        }).listen(PORT, HOST,{ result ->
         if (result.succeeded())
             future.complete()
         else
@@ -85,81 +111,114 @@ java -jar build/libs/vertx-todo.jar
 
     }
 
-    private void initData() {
-/*
-        RedisOptions config = new RedisOptions()
-                .setHost(config().getString("redis.host", REDIS_HOST))
-                .setPort(config().getInteger("redis.port", REDIS_PORT));
+    void initData() {
 
-        this.redis = RedisClient.create(vertx, config); // create redis client
+        JsonObject config = new JsonObject()
+            .put("url","jdbc:h2:mem:~/tododb")
+            .put("driver_class","org.h2.Driver")
+            .put("user","sa")
+            .put("password","")
 
-        redis.hset(Constants.REDIS_TODO_KEY, "24", Json.encodePrettily( // test connection
-                new Todo(24, "Something to do...", false, 1, "todo/ex")), res -> {
-            if (res.failed()) {
-                LOGGER.error("Redis service is not running!");
-                res.cause().printStackTrace();
+        this.client =  JDBCClient.createNonShared(vertx, config)
+        this.client.getConnection({ conn ->
+            if (conn.succeeded()) {
+                SQLConnection connection = conn.result()
+                connection.query(TodoService.SQL_CREATE, { res2 ->
+                    if (res2.succeeded()) {
+                        log.info('*********** Table todo created ************')
+                    }
+                })
+            } else {
+                // Failed to get connection - deal with it
+                log.info('*********** Cannot create Table todo ************')
+
             }
-        });
-*/
+        })
+//        this.service = new TodoService(vertx, config)
+//        service.initData()
+
     }
 
     private void handleGetTodo(RoutingContext context) {
-        String todoID = context.request().getParam("todoId") // retrieve the path parameter todoId
-        if (todoID == null)
-            sendError(400, context.response()) // the server should send a 400 Bad Request error response to client
-        else {
-            redis.hget({ REDIS_TODO_KEY, todoId, x -> // hget means: get an entry by key from the map (RedisClient hget(String, String, Handler))
-                if (x.succeeded()) {
-                String result = x.result()
-                if (result == null)
-                    sendError(404, context.response())
-                else {
-                    context.response()
-                            .putHeader("content-type", "application/json")
-                            .end(result) // If the result is valid, we could write it to response by end method
-                }
-            } else
-                sendError(503, context.response())
-        })
-        }
+//        String todoID = context.request().getParam("todoId") // retrieve the path parameter todoId
+//        if (todoID == null)
+//            sendError(400, context.response()) // the server should send a 400 Bad Request error response to client
+//        else {
+//            redis.hget({ REDIS_TODO_KEY, todoId, x -> // hget means: get an entry by key from the map (RedisClient hget(String, String, Handler))
+//                if (x.succeeded()) {
+//                String result = x.result()
+//                if (result == null)
+//                    sendError(404, context.response())
+//                else {
+//                    context.response()
+//                            .putHeader("content-type", "application/json")
+//                            .end(result) // If the result is valid, we could write it to response by end method
+//                }
+//            } else
+//                sendError(503, context.response())
+//        })
+//        }
     }
 
     private void handleGetAll(RoutingContext context) {
-        redis.hvals({REDIS_TODO_KEY, res -> // hvals returns all values in the hash stored at key
-        if (res.succeeded()) {
-            String encoded = Json.encodePrettily(res.result().stream() // Now we could use Json.encodePrettily method to convert the list to JSON string
-                    .map({x -> new Todo((String) x)})
-//                    .collect(Collectors.toList()))
-                    .collect())
-            context.response()
-                    .putHeader("content-type", "application/json")
-                    .end(encoded) // Finally we write the encoded result to response as before
-        } else
-            sendError(503, context.response())
-    })
+            this.client.getConnection({ conn ->
+            if (conn.succeeded()) {
+                SQLConnection connection = conn.result()
+                connection.query("SELECT * FROM todo", { res ->
+                if (res.succeeded()) {
+                    String encoded = Json.encodePrettily(res.result()
+                            .getRows(true)
+                            .collect{ todo -> new Todo(todo) }
+                            .toList())
+                    context.response()
+                            .putHeader("content-type", "application/json")
+                            .end(encoded)
+                }
+            })
+            } else {
+                // Failed to get connection - deal with it
+                sendError(503, context.response())
+            }
+        })
+
+//        context.response()
+//                .putHeader('content-type', 'text/html').write('ok')
+
     }
 
     private void handleCreateTodo(RoutingContext context) {
         try {
-            final Todo todo = wrapObject(new Todo(context.getBodyAsString()), context) //to retrieve JSON data from the request body and decode JSON data to todo entity with the specific constructor
-            final String encoded = Json.encodePrettily(todo)
-            redis.hset(REDIS_TODO_KEY, String.valueOf(todo.getId()),
-                    encoded, { res ->
-            if (res.succeeded())
-                context.response()
-                        .setStatusCode(201) // By default Vert.x Web is setting the status to 200 meaning OK. 201 means CREATED
-                        .putHeader("content-type", "application/json; charset=utf-8")
-                        .end(encoded)
-            else
-                sendError(503, context.response())
-        })
+            //to retrieve JSON data from the request body and decode JSON data to todo entity with the specific constructor
+            final String encoded = Json.encodePrettily( Todo.fromJson( context.getBodyAsString()) )
+//            JsonArray payload = new JsonArray(encoded)
+//            String encoded = "INSERT INTO `todo` " +
+//                    "(`title`, `completed`, `order`, `url`) VALUES ('learning', 1, 1, 'http')"
+            this.client.getConnection({ conn ->
+                if (conn.succeeded()) {
+                    SQLConnection connection = conn.result()
+                    connection.queryWithParams(TodoService.SQL_INSERT, encoded, { res ->
+                        if (res.succeeded())
+                            context.response()
+                                    // By default Vert.x Web is setting the status to 200 meaning OK. 201 means CREATED
+                                    .setStatusCode(201)
+                                    .putHeader("content-type", "application/json; charset=utf-8")
+                                    .end(encoded)
+                        else
+                            sendError(503, context.response())
+                    })
+                } else {
+                    // Failed to get connection - deal with it
+                    sendError(503, context.response())
+                }
+            })
+
         } catch (DecodeException e) {
             sendError(400, context.response())
         }
     }
 
     // PATCH /todos/:todoId
-    private void handleUpdateTodo(RoutingContext context) {
+    /*private void handleUpdateTodo(RoutingContext context) {
         try {
             String todoID = context.request().getParam("todoId") // retrieve the path parameter todoId from the route context
             final Todo newTodo = new Todo(context.getBodyAsString()) // get the new todo entity from the request body
@@ -192,8 +251,8 @@ java -jar build/libs/vertx-todo.jar
             sendError(400, context.response())
         }
     }
-
-    private void handleDeleteOne(RoutingContext context) {
+*/
+    /*private void handleDeleteOne(RoutingContext context) {
         String todoID = context.request().getParam("todoId");
         redis.hdel({ REDIS_TODO_KEY, todoId, res ->
         if (res.succeeded())
@@ -202,8 +261,8 @@ java -jar build/libs/vertx-todo.jar
             sendError(503, context.response())
     });
     }
-
-    private void handleDeleteAll(RoutingContext context) {
+*/
+    /*private void handleDeleteAll(RoutingContext context) {
         redis.del({ REDIS_TODO_KEY, res ->
             if (res.succeeded())
                 context.response().setStatusCode(204).end()
@@ -211,8 +270,8 @@ java -jar build/libs/vertx-todo.jar
                 sendError(503, context.response())
             })
     }
-
-    // the id of todos could not be duplicate, so we implement this method
+*/
+    /*/ the id of todos could not be duplicate, so we implement this method
     private Todo wrapObject(Todo todo, RoutingContext context) {
         int id = todo.id
         if (id > Todo.getIncId()) {
@@ -222,7 +281,7 @@ java -jar build/libs/vertx-todo.jar
         todo.setUrl(context.request().absoluteURI() + "/" + todo.getId());
         return todo
     }
-
+*/
     private void sendError(int statusCode, HttpServerResponse response) {
         response.setStatusCode(statusCode).end()
     }

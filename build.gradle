@@ -4,7 +4,7 @@ apply plugin: 'groovy'
 targetCompatibility = 1.8
 sourceCompatibility = 1.8
 
-//mainClassName = 'Hello'
+//mainClassName = 'SingleApplicationVerticle'
 
 ext {
     vertxVersion = "3.5.4"
@@ -18,20 +18,19 @@ dependencies {
 
     compile "io.vertx:vertx-core:${vertxVersion}"
     compile "io.vertx:vertx-web:${vertxVersion}" // for REST API
-    compile 'com.h2database:h2:1.4.200'
+    compile "io.vertx:vertx-jdbc-client:${vertxVersion}"
+    compile "io.vertx:vertx-sql-common:${vertxVersion}"
 
-//    compileOnly "io.vertx:vertx-codegen:${vertxVersion}" // Beans marshaller to JSON
+    // h2 database
+    compile 'com.h2database:h2:1.4.197'
+//    compile 'mysql:mysql-connector-java:6.0.5'
 //    compile "io.vertx:vertx-redis-client:${vertxVersion}"
 
     // not used in this branch
+//    compileOnly "io.vertx:vertx-codegen:${vertxVersion}" // Beans marshaller to JSON
 //    compile "io.vertx:vertx-auth-common:${vertxVersion}"
 //    compile "io.vertx:vertx-lang-groovy:${vertxVersion}"
 //    compile "io.vertx:vertx-rx-java:${vertxVersion}"
-
-    // not used in this app
-//    compile "io.vertx:vertx-jdbc-client:${vertxVersion}"
-//    compileOnly "io.vertx:vertx-codegen:${vertxVersion}"
-//    compile 'mysql:mysql-connector-java:6.0.5'
 
 
     compile 'org.slf4j:slf4j-simple:1.7.22'
