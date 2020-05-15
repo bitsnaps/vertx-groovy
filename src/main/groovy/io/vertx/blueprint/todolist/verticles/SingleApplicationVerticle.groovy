@@ -24,20 +24,20 @@ class SingleApplicationVerticle extends AbstractVerticle {
 /*
 #running process:
 gradle build
-java -jar build/libs/vertx-blueprint-todo-backend-fat.jar
+java -jar build/libs/vertx-todo.jar
 */
 
-    private static final String HTTP_HOST = "0.0.0.0"
-    private static final String REDIS_HOST = "127.0.0.1"
-    private static final int HTTP_PORT = 8082
-    private static final int REDIS_PORT = 6379
+    public static final String HTTP_HOST = "127.0.0.1"
+//    private static final String REDIS_HOST = "127.0.0.1"
+    public static final int PORT = 8080
+//    private static final int REDIS_PORT = 6379 // we do not use Redis here, we've used h2 instead
 
 //    private RedisClient redis;
 
     //asynchronous start method
     @Override
     void start(Future<Void> future) throws Exception {
-        initData()
+//        initData()
 
         Router router = Router.router(vertx) // The router is responsible for dispatching HTTP requests to the certain right handler
         // CORS support
@@ -56,14 +56,16 @@ java -jar build/libs/vertx-blueprint-todo-backend-fat.jar
         router.route().handler(CorsHandler.create("*") // The route() method with no parameters means that it matches all requests
                 .allowedHeaders(allowHeaders)
                 .allowedMethods(allowMethods))
+
         router.route().handler(BodyHandler.create()) // The BodyHandler allows you to retrieve request bodies and read data
 
         // routes
-        router.get(API_GET).handler({ req ->
+        router.get('/').handler({ req ->
             req.response()
-                    .putHeader("content-type", "text/html")
-                    .end("<html><body><h1>Todo App</h1></body></html>")
+                .putHeader("content-type", "text/html")
+                .end("Welcome to Todo RestAPI!")
         })
+
 //        router.get(API_GET).handler(this.handleGetTodo())
 //        router.get(API_LIST_ALL).handler(this.handleGetAll())
 //        router.post(API_CREATE).handler(this.handleCreateTodo())
@@ -72,14 +74,15 @@ java -jar build/libs/vertx-blueprint-todo-backend-fat.jar
 //        router.delete(API_DELETE_ALL).handler(this.handleDeleteAll())
 
         vertx.createHttpServer() // create a HTTP server
-//                .requestHandler(router::accept)
-                .requestHandler({ request -> router.accept(request) })
-                .listen({ PORT, HOST, result ->
+                .requestHandler({ req ->
+            router.accept(req)
+        }).listen(PORT, HTTP_HOST,{ result ->
         if (result.succeeded())
             future.complete()
         else
             future.fail(result.cause())
-    })
+        })
+
     }
 
     private void initData() {

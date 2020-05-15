@@ -46,7 +46,7 @@ dependencies {
 
 jar {
     // by default fat jar
-    archiveName = 'vertx-blueprint-todo-backend-fat.jar'
+    archiveName = 'vertx-todo.jar'
     from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
     manifest {
         attributes 'Main-Class': 'io.vertx.core.Launcher'
