@@ -24,6 +24,7 @@ public class Hello extends RestfulApiVerticle {
      * CREATE:
      *  curl -d '{"title":"Learn Vert.x","completed":true,"order":1}' -H "Content-Type: application/json" http://127.0.0.1:8080/todos
      *  curl -d '{"title":"Learn Vert.x with RxJava2","completed":true,"order":2}' -H "Content-Type: application/json" http://127.0.0.1:8080/todos
+     *  curl -d '{"title":"Learn RxJS","completed":false,"order":3}' -H "Content-Type: application/json" http://127.0.0.1:8080/todos
      *
      * READ:
      * curl http://localhost:8080/todos/2
@@ -33,6 +34,7 @@ public class Hello extends RestfulApiVerticle {
      *
      * DELETE:
      * curl -X DELETE http://localhost:8080/todos/1
+     * curl -X DELETE http://localhost:8080/todos
      *
      */
     private static final Logger logger = LoggerFactory.getLogger(Hello.class);
