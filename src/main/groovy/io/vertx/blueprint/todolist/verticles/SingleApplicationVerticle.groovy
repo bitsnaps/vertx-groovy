@@ -4,7 +4,10 @@ import groovy.util.logging.Slf4j
 import io.vertx.blueprint.todolist.entity.Todo
 import io.vertx.blueprint.todolist.service.TodoService
 import io.vertx.core.AbstractVerticle
+import io.vertx.core.AsyncResult
 import io.vertx.core.Future
+import io.vertx.core.Handler
+import io.vertx.core.Promise
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.http.HttpServerResponse
 import io.vertx.core.json.DecodeException
@@ -16,6 +19,8 @@ import io.vertx.ext.web.Router
 import io.vertx.ext.web.RoutingContext
 import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.CorsHandler
+
+import java.util.function.Consumer
 
 /**
  * A Verticle is a component of the application. We can deploy verticles to run the components
@@ -115,6 +120,19 @@ class SingleApplicationVerticle extends AbstractVerticle {
     }
 
     /**
+     * Wrap the result handler with failure handler (503 Service Unavailable)
+     */
+    private <T> Handler<AsyncResult<T>> resultHandler(RoutingContext context, Consumer<T> consumer) {
+        return { Future<T> res ->
+            if (res.succeeded()) {
+                consumer.accept(res.result())
+            } else {
+                serviceUnavailable(context)
+            }
+        }
+    }
+
+    /**
      * curl localhost:8080/todos/1
      * @param context
      */
@@ -122,49 +140,57 @@ class SingleApplicationVerticle extends AbstractVerticle {
         // retrieve the path parameter todoId
         String todoID = context.request().getParam("todoId")
         if (todoID == null)
-            sendError(400, context.response()) // the server should send a 400 Bad Request error response to client
+            // the server should send a 400 Bad Request error response to client
+            sendError(400, context.response())
         else {
-            this.service.client.getConnection({ conn ->
-                if (conn.succeeded()) {
-                    SQLConnection connection = conn.result()
-                    connection.queryWithParams(TodoService.SQL_QUERY, new JsonArray([todoID]), { res ->
-                        if (res == null || res.result().getNumRows()==0)
-                            sendError(404, context.response())
-                        else {
-                            context.response()
-                                    .putHeader("content-type", "application/json")
-                                    .end(res.result().getRows(true).first().toString().toLowerCase()) // If the result is valid, we could write it to response by end method
-                        }
-                    })
-                } else {
-                    // Failed to get connection - deal with it
-                    sendError(503, context.response())
-                }
-            })
-
+            this.service.getCertain(todoID).setHandler(resultHandler(context, { Optional<Todo> res ->
+                if (!res.isPresent())
+                    sendError(404, context.response())
+                else {
+                    String encoded = Json.encodePrettily(res.get())
+                    context.response()
+                        .putHeader("content-type", "application/json")
+                        .end(encoded)
+            }
+            }))
         }
     }
 
+    /**
+     * curl localhost:8080/todos
+     * @param context
+     */
     private void handleGetAll(RoutingContext context) {
-            this.service.client.getConnection({ conn ->
+        this.service.getAll().setHandler(resultHandler(context, { res ->
+            if (res == null){
+                serviceUnavailable(context)
+            } else {
+//                String encoded = Json.encodePrettily(res)
+                String encoded = (res as List<Todo>)*.toJson().collect().toString()
+                context.response()
+                    .putHeader("content-type", "application/json")
+                    .end(encoded)
+            }
+        }))
+            /*this.service.client.getConnection({ conn ->
             if (conn.succeeded()) {
                 SQLConnection connection = conn.result()
                 connection.query(TodoService.SQL_QUERY_ALL, { res ->
-                if (res.succeeded()) {
-                    String encoded = Json.encodePrettily(res.result()
-                            .getRows(true)
-                            .collect{ x -> Todo.fromJson(x.toString()) }
-                            .toList())
-                    context.response()
-                            .putHeader("content-type", "application/json")
-                            .end(encoded)
-                }
-            })
+                    if (res.succeeded()) {
+                        String encoded = Json.encodePrettily(res.result()
+                                .getRows(true)
+                                .collect{ x -> Todo.fromJson(x.toString()) }
+                                .toList())
+                        context.response()
+                                .putHeader("content-type", "application/json")
+                                .end(encoded)
+                    }
+                })
             } else {
                 // Failed to get connection - deal with it
                 sendError(503, context.response())
             }
-        })
+        })*/
     }
 
     /**
@@ -176,25 +202,17 @@ class SingleApplicationVerticle extends AbstractVerticle {
         try {
             //to retrieve JSON data from the request body and decode JSON data to todo entity with the specific constructor
             Todo todo = Todo.fromJson(context.getBodyAsString())
-            JsonArray payload = todo.toJsonArray()
-            this.service.client.getConnection({ conn ->
-                if (conn.succeeded()) {
-                    SQLConnection connection = conn.result()
-                    connection.queryWithParams(TodoService.SQL_INSERT, payload, { res ->
-                        if (res.succeeded())
-                            context.response()
-                                    // By default Vert.x Web is setting the status to 200 meaning OK. 201 means CREATED
-                                    .setStatusCode(201)
-                                    .putHeader("content-type", "application/json; charset=utf-8")
-                                    .end(Json.encodePrettily(todo))
-                        else
-                            sendError(503, context.response())
-                    })
-                } else {
-                    // Failed to get connection - deal with it
+            this.service.insert(todo).setHandler(resultHandler(context, { res ->
+                if (res)
+                    context.response()
+                            // By default Vert.x Web is setting the status to 200 meaning OK. 201 means CREATED
+                            .setStatusCode(201)
+                            .putHeader("content-type", "application/json; charset=utf-8")
+                            .end(todo.toJson())
+                else
                     sendError(503, context.response())
-                }
-            })
+
+            }))
 
         } catch (DecodeException e) {
             sendError(400, context.response())
@@ -209,31 +227,23 @@ class SingleApplicationVerticle extends AbstractVerticle {
         try {
             // retrieve the path parameter todoId from the route context
             String todoID = context.request().getParam("todoId")
-            // get the new todo entity from the request body
+            // get the value entity from the request body
             final Todo newTodo = Todo.fromJson(context.getBodyAsString())
             // handle error
             if (todoID == null || newTodo == null) {
                 sendError(400, context.response())
-            } else
-                this.service.client.getConnection({ conn ->
-                    if (conn.succeeded()) {
-                        SQLConnection connection = conn.result()
-                        JsonArray params = newTodo.toJsonArray()
-                        connection.updateWithParams( TodoService.SQL_UPDATE, params.add(newTodo.id), { res ->
-                            if (res.succeeded()) {
-                                context.response()
-                                        .putHeader("content-type", "application/json")
-                                        .end(newTodo.toJson())  // If the operation is successful, write response with 200 OK status
-                            } else {
-                                // check whether it exists. If not, return 404 Not Found status
-                                sendError(404, context.response())
-                            }
-                        })
-                    } else {
-                        // Failed to get connection - deal with it
-                        sendError(503, context.response())
-                    }
-                })
+                return
+            }
+            this.service.update(todoID, newTodo).setHandler(resultHandler(context, { res ->
+                if (res == null){
+                    sendError(404, context.response())
+                } else {
+                    context.response()
+                        .putHeader("content-type", "application/json")
+                        // If the operation is successful, write response with 200 OK status
+                        .end(newTodo.toJson())
+                }
+            }))
         } catch (DecodeException e) {
             sendError(400, context.response())
         }
@@ -245,25 +255,15 @@ class SingleApplicationVerticle extends AbstractVerticle {
      */
     private void handleDeleteOne(RoutingContext context) {
         String todoID = context.request().getParam("todoId")
-
-        this.service.client.getConnection({ conn ->
-            if (conn.succeeded()) {
-                SQLConnection connection = conn.result()
-                connection.updateWithParams(TodoService.SQL_DELETE, new JsonArray([todoID]), { res ->
-                    if (res.succeeded()) {
-                        //Response to the HTTP method delete have generally no content (204 - NO CONTENT)
-                        context.response().setStatusCode(204).end()
-                    } else {
-                        // check whether it exists. If not, return 404 Not Found status
-                        sendError(404, context.response())
-                    }
-                })
+        this.service.delete(todoID).setHandler(resultHandler(context, { res ->
+            if (res != null) {
+                //Response to the HTTP method delete have generally no content (204 - NO CONTENT)
+                context.response().setStatusCode(204).end()
             } else {
-                // Failed to get connection - deal with it
-                sendError(503, context.response())
+                // check whether it exists. If not, return 404 Not Found status
+                sendError(404, context.response())
             }
-        })
-
+        }))
     }
 
     /**
@@ -271,25 +271,21 @@ class SingleApplicationVerticle extends AbstractVerticle {
      * @param context
      */
     private void handleDeleteAll(RoutingContext context) {
-
-        this.service.client.getConnection({ conn ->
-            if (conn.succeeded()) {
-                SQLConnection connection = conn.result()
-                connection.execute( TodoService.SQL_DELETE_ALL, { res ->
-                    if (res.succeeded()) {
-                        context.response().setStatusCode(204).end()
-                    } else {
-                        sendError(404, context.response())
-                    }
-                })
+        this.service.deleteAll().setHandler(resultHandler(context, { res ->
+            if (res != null) {
+                context.response().setStatusCode(204).end()
             } else {
-                sendError(503, context.response())
+                sendError(404, context.response())
             }
-        })
+        }))
     }
 
     private void sendError(int statusCode, HttpServerResponse response) {
         response.setStatusCode(statusCode).end()
+    }
+
+    private void serviceUnavailable(HttpServerResponse response) {
+        response.setStatusCode(503).end()
     }
 
 /*
