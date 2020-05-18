@@ -8,6 +8,7 @@ import java.util.List;
 
 public interface TodoService {
 
+  // Rx way
   Completable initData();
 
   Single<Todo> insert(Todo todo);

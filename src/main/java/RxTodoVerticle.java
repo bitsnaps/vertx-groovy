@@ -9,16 +9,9 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.reactivex.ext.web.Router;
 import io.vertx.reactivex.ext.web.RoutingContext;
 import io.vertx.reactivex.ext.web.handler.BodyHandler;
-
 import java.util.Objects;
 
-//import io.vertx.ext.web.Router;
-//import io.vertx.ext.web.RoutingContext;
-//import io.vertx.ext.web.handler.BodyHandler;
-//import io.vertx.ext.web.handler.CorsHandler;
-
-
-public class Hello extends RestfulApiVerticle {
+public class RxTodoVerticle extends RestfulApiVerticle {
     /**
      *
      * CREATE:
@@ -37,7 +30,7 @@ public class Hello extends RestfulApiVerticle {
      * curl -X DELETE http://localhost:8080/todos
      *
      */
-    private static final Logger logger = LoggerFactory.getLogger(Hello.class);
+    private static final Logger logger = LoggerFactory.getLogger(RxTodoVerticle.class);
 
     private static final String HOST = "0.0.0.0";
     private static final int PORT = 8080;
