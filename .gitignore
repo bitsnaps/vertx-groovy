@@ -33,3 +33,7 @@ rethinkdb_data/
 .DS_Store
 
 .idea/
+auto-import.
+*.iml
+*.ipr
+modules.xml
