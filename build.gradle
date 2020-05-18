@@ -39,7 +39,8 @@ dependencies {
     compile 'org.codehaus.groovy:groovy-all:2.5.1'
 
     // testing
-//    testCompile "io.vertx:vertx-unit:${vertxVersion}"
+//    testCompile "io.vertx:vertx-junit5:${vertxVersion}"
+    testCompile "io.vertx:vertx-unit:${vertxVersion}"
     testCompile 'junit:junit:4.12'
 
 }

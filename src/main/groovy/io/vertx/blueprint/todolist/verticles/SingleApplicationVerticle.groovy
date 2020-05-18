@@ -127,7 +127,7 @@ class SingleApplicationVerticle extends AbstractVerticle {
             if (res.succeeded()) {
                 consumer.accept(res.result())
             } else {
-                serviceUnavailable(context)
+                serviceUnavailable(context.response())
             }
         }
     }
