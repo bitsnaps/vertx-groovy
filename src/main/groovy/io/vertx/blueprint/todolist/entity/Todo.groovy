@@ -39,7 +39,8 @@ class Todo {
                 getOrElse(todo.title, title),
                 getOrElse(todo.completed, completed),
                 getOrElse(todo.order, order),
-                url)
+                getOrElse(todo.url, url)
+        )
     }
 
 }
